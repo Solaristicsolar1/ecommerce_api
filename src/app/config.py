@@ -11,3 +11,8 @@ class Settings(BaseSettings):
 
 # We create ONE instance of this settings object to use globally
 settings = Settings()
+
+if __name__ == "__main__":
+    print(f"✅ DB URL: {settings.database_url}")
+    print(f"✅ Env: {settings.environment}")
+    print(f"✅ Secret Key Length: {len(settings.secret_key)} chars")
