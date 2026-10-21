@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import BeforeValidator, StringConstraints, BaseModel, EmailStr, field_validator
 
 
-def normalize_full_name(value: object) -> object:
+def normalize_full_name(value: str) -> str:
     if not isinstance(value, str):
         return value
 

@@ -1,0 +1,4 @@
+DROP DATABASE IF EXISTS ecommerce_api;
+CREATE DATABASE ecommerce_api;
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
