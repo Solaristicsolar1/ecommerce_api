@@ -1,4 +1,6 @@
-DROP DATABASE IF EXISTS ecommerce_api;
-CREATE DATABASE ecommerce_api;
+-- DROP DATABASE IF EXISTS ecommerce_api;
+-- CREATE DATABASE ecommerce_api;
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+SELECT * FROM users;
