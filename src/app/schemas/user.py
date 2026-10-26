@@ -1,8 +1,16 @@
+
 import re
 import uuid
 from typing import Annotated
 from datetime import datetime
-from pydantic import BeforeValidator, StringConstraints, BaseModel, EmailStr, field_validator
+
+from pydantic import (
+    BeforeValidator,
+    StringConstraints,
+    BaseModel,
+    EmailStr,
+    field_validator,
+)
 
 
 def normalize_full_name(value: str) -> str:
@@ -22,14 +30,15 @@ Name = Annotated[
     ),
 ]
 
+
 Password = Annotated[
     str,
     StringConstraints(
         min_length=8,
         max_length=128,
-        pattern=r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d\s])\S+$",
     ),
 ]
+
 
 class UserCreate(BaseModel):
     full_name: Name
@@ -44,6 +53,37 @@ class UserCreate(BaseModel):
             return value.strip().lower()
         return value
 
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        if not any(c.islower() for c in value):
+            raise ValueError(
+                "Password must contain a lowercase letter"
+            )
+
+        if not any(c.isupper() for c in value):
+            raise ValueError(
+                "Password must contain an uppercase letter"
+            )
+
+        if not any(c.isdigit() for c in value):
+            raise ValueError(
+                "Password must contain a digit"
+            )
+
+        if not any(not c.isalnum() and not c.isspace() for c in value):
+            raise ValueError(
+                "Password must contain a special character"
+            )
+
+        if any(c.isspace() for c in value):
+            raise ValueError(
+                "Password must not contain spaces"
+            )
+
+        return value
+
+
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: EmailStr
@@ -52,4 +92,4 @@ class UserResponse(BaseModel):
     email_verified: bool
     created_at: datetime
 
-    model_config = {"from_attributes": True}  # Enables SQLAlchemy → Pydantic conversion
+    model_config = {"from_attributes": True}
