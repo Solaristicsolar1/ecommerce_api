@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from sqlalchemy.exc import IntegrityError
-from app.schemas.user import UserCreate, UserResponse, UserUpdate
+from app.schemas.user import CustomerRegister, UserResponse, UserUpdate
 from app.models.user import User
 from app.utils.auth import hash_password
 from sqlalchemy import select
@@ -27,12 +27,13 @@ def get_user(user_id: uuid.UUID, db: Session=Depends(get_db)):
     return user
 
 @router.post("", response_model=UserResponse)
-def post_user(user: UserCreate, db: Session = Depends(get_db)):
+def post_user(user: CustomerRegister, db: Session = Depends(get_db)):
     create_user = User(
         email=user.email,
         password_hash=hash_password(user.password),
         full_name=user.full_name,
         phone=user.phone,
+        role=user.role,
     )
     try:
         db.add(create_user)
@@ -78,11 +79,17 @@ def update_user(user_id: uuid.UUID, user_data: UserUpdate, db: Session=Depends(g
 
         update_data["full_name"] = full_name.strip()
 
-    if "email" in update_data and update_data["email"] is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Email cannot be null",
-        )
+    if "phone" in update_data:
+        phone = update_data["phone"]
+
+        if phone is None or not phone.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Phone number cannot be empty",
+            )
+
+        update_data["phone"] = phone.strip()
+
 
     # 5. Apply the changes to the SQLAlchemy object
     for field, value in update_data.items():

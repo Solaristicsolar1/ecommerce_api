@@ -1,28 +1,26 @@
 import re
 import uuid
-from typing import Annotated
+import phonenumbers
+
+from phonenumbers import PhoneNumberFormat
+from app.models.user import UserRole
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import (
+    BaseModel,
     BeforeValidator,
     StringConstraints,
-    BaseModel,
     EmailStr,
+    ConfigDict,
 )
 
 
-# ---------------------------------------------------------------
-# REUSABLE TYPES
-# Each type bundles "clean up" + "check" rules in one place, so any
-# schema can use it by just writing e.g. `email: Email`.
-# ---------------------------------------------------------------
 
-# Password rules: 8-128 characters, with at least one lowercase letter,
-# one uppercase letter, one digit, one special character, and no spaces.
-# The (?=...) parts are "lookaheads": each one demands that something
-# exists somewhere in the text. Pydantic's default regex engine can't
-# handle them, so any model using this type needs
-# model_config = {"regex_engine": "python-re"}.
+# --------------------------------------------------
+# REUSABLE TYPES
+# --------------------------------------------------
+
 StrongPassword = Annotated[
     str,
     StringConstraints(
@@ -34,19 +32,13 @@ StrongPassword = Annotated[
 
 
 def normalize_full_name(value: str) -> str:
-    # If it's not a string (e.g. None or a number), leave it alone and let
-    # the later checks report the proper error.
     if not isinstance(value, str):
         return value
 
-    # Collapse repeated whitespace into one space, trim the ends,
-    # and lowercase: "  Jane   DOE " -> "jane doe"
-    return re.sub(r"\s+", " ", value).strip().lower()
+    # Remove extra spaces and preserve the person's letter case.
+    return re.sub(r"\s+", " ", value).strip()
 
 
-# Name: cleaned FIRST (BeforeValidator), then checked against the rules:
-# 2-50 characters, letters only, with single spaces, apostrophes or
-# hyphens allowed between words (e.g. "mary-jane o'brien").
 Name = Annotated[
     str,
     BeforeValidator(normalize_full_name),
@@ -59,60 +51,84 @@ Name = Annotated[
 
 
 def normalize_email(value):
-    # Same idea: only touch strings, pass everything else through.
     if isinstance(value, str):
-        # Trim spaces and lowercase: " Jane@Example.com " -> "jane@example.com"
         return value.strip().lower()
     return value
 
 
-# Email: cleaned FIRST, then validated by EmailStr (which checks the
-# format). Cleaning first matters, because stray spaces would make
-# EmailStr reject an otherwise valid address.
 Email = Annotated[
     EmailStr,
     BeforeValidator(normalize_email),
 ]
 
+
+def validate_nigerian_phone(value: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError("Phone number must be a string")
+
+    try:
+        number = phonenumbers.parse(value, "NG")
+    except phonenumbers.NumberParseException:
+        raise ValueError("Invalid Nigerian phone number")
+
+    if not phonenumbers.is_valid_number_for_region(number, "NG"):
+        raise ValueError("Enter a valid Nigerian phone number")
+
+    return phonenumbers.format_number(
+        number, PhoneNumberFormat.E164
+    )
+
 Phone = Annotated[
     str,
-    StringConstraints(min_length=7, max_length=20),
+    BeforeValidator(validate_nigerian_phone),
 ]
 
-# ---------------------------------------------------------------
-# SCHEMAS
-# These describe the shape of data going into and out of the API.
-# ---------------------------------------------------------------
 
-# Data the client sends when signing up.
-class UserCreate(BaseModel):
-    # Required because StrongPassword uses lookaheads (see above).
-    model_config = {"regex_engine": "python-re"}
+# --------------------------------------------------
+# CUSTOMER REGISTRATION
+# --------------------------------------------------
+
+class CustomerRegister(BaseModel):
+    model_config = ConfigDict(regex_engine="python-re")
 
     full_name: Name
     email: Email
     password: StrongPassword
-    phone: Phone | None = None  # optional
+    phone: Phone
 
 
-# Data the API sends back. Note: no password field, so it can never leak.
+# --------------------------------------------------
+# USER RESPONSE
+# --------------------------------------------------
+
 class UserResponse(BaseModel):
     id: uuid.UUID
-    email: EmailStr
     full_name: str
+    email: EmailStr
+    phone: str | None
+    role: UserRole
     is_active: bool
     email_verified: bool
+    phone_verified: bool
     created_at: datetime
 
-    # Lets Pydantic read data straight from a database object (the
-    # SQLAlchemy User model) instead of requiring a dictionary.
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
-# Data the client sends when editing a profile (PATCH).
-# Every field is optional, so the client can send only what changed.
-# Name and Email give updates the same cleanup and rules as sign-up.
+# --------------------------------------------------
+# UPDATE OWN PROFILE
+# --------------------------------------------------
+
 class UserUpdate(BaseModel):
+    model_config = ConfigDict(regex_engine="python-re")
+
     full_name: Name | None = None
-    email: Email | None = None
     phone: Phone | None = None
+
+
+# --------------------------------------------------
+# CURRENT USER RESPONSE
+# --------------------------------------------------
+
+class UserMeResponse(UserResponse):
+    pass

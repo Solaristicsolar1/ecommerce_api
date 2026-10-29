@@ -3,7 +3,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # We define the variables we expect to find in the .env file
     environment: str = "development"
-    secret_key: str
     database_url: str
 
     # This tells Pydantic: "Go look in the .env file for these values"

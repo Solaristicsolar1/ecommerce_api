@@ -1,31 +1,47 @@
+import enum
 import uuid
 from datetime import datetime
-from sqlalchemy import Boolean, DateTime, String, text, func
-from sqlalchemy import Uuid
+from sqlalchemy import Boolean, DateTime, Enum, Index, String, Uuid, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
+class UserRole(str, enum.Enum):
+    customer = "customer"
+    admin = "admin"
+    product_manager = "product_manager"
+    fulfilment = "fulfilment"
+
+
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        Index("uq_users_email_lower", func.lower(text("email")), unique=True),
+    )
 
-    # OWNER: DB → Postgres generates the UUID at insert
-    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
-
-    # Business data — app supplies
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True)
 
-    # OWNER: DB → initial value true, app may flip later
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole, name="user_role", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+        server_default=text("'customer'"),
+        index=True,
+    )
+
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
-
-    # OWNER: DB → initial value false, app flips to true after verification
     email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    phone_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
 
-    # OWNER: DB → now() at insert
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
-    # OWNER: DB → now() at insert, trigger bumps on update
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
