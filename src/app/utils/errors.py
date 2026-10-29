@@ -18,7 +18,8 @@ def friendly_message(err: dict) -> str:
         if err["type"] == "string_too_long":
             return "Password must be at most 128 characters long."
 
-    return err["msg"]  # fall back to Pydantic's default message
+    # Remove Pydantic's "Value error, " prefix from our own messages
+    return err["msg"].removeprefix("Value error, ")
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     errors = [

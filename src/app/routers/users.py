@@ -32,8 +32,8 @@ def post_user(user: CustomerRegister, db: Session = Depends(get_db)):
         email=user.email,
         password_hash=hash_password(user.password),
         full_name=user.full_name,
-        phone=user.phone,
-        role=user.role,
+        phone=user.phone
+        # role=user.role
     )
     try:
         db.add(create_user)
